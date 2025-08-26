@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Sender</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Ubuntu -->
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap" rel="stylesheet">
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <!-- Configuration File -->
+    <script src="config.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="container w-full max-w-4xl p-8 md:p-10">
+        <!-- Header Section -->
+        <div class="text-center mb-8">
+            <div class="floating mb-4">
+                <div class="w-16 h-16 bg-gradient-to-r from-[#03acff] to-[#341bca] rounded-full mx-auto flex items-center justify-center shadow-lg">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+            </div>
+            <h1 class="heading text-4xl md:text-5xl mb-4">Send Email</h1>
+            <p class="subtext text-base md:text-lg max-w-2xl mx-auto">
+                Simply enter who to send to and your message. Company brochures are automatically included!
+            </p>
+            </div>
+
+        <form id="emailForm" class="space-y-6">
+            <!-- Your Name -->
+            <div class="form-group">
+                <label for="name" class="form-label">Your Name</label>
+                <input type="text" id="name" name="name" required
+                       class="form-input" placeholder="Enter your name">
+                <p class="text-sm text-gray-500 mt-1">Who is sending this email?</p>
+            </div>
+
+            <!-- Recipient Email (Who should receive the email) -->
+            <div class="form-group">
+                <label for="recipient" class="form-label">Send Email To</label>
+                <input type="text" id="recipient" name="recipient" required
+                       class="form-input" placeholder="Enter recipient email(s) - separate multiple emails with commas">
+                <p class="text-sm text-gray-500 mt-1">Who should receive this email? (You can add multiple emails separated by commas)</p>
+            </div>
+
+            <!-- Message -->
+            <div class="form-group">
+                <label for="message" class="form-label">Message</label>
+                <textarea id="message" name="message" rows="6" required
+                          class="form-input resize-none" placeholder="Type your message here..."></textarea>
+            </div>
+
+
+
+            <!-- Submit Button -->
+            <button type="submit" class="primary-button w-full py-4 text-lg font-semibold">
+                <span id="buttonText">Send Email</span>
+                <span id="buttonLoading" class="hidden">
+                    <span class="loading-spinner"></span>
+                    Sending...
+                </span>
+            </button>
+        </form>
+
+        <!-- Message Box -->
+        <div id="messageBox" class="hidden message-box" role="alert"></div>
+    </div>
+
+    <!-- Popup Modal -->
+    <div id="emailModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <!-- Loading State -->
+            <div id="modalLoading" class="modal-section">
+                <div class="loading-animation">
+                    <div class="spinner"></div>
+                </div>
+                <h3 class="modal-title">Sending Email...</h3>
+                <p class="modal-message">Please wait while we send your email with attachments.</p>
+            </div>
+
+            <!-- Success State -->
+            <div id="modalSuccess" class="modal-section hidden">
+                <div class="success-animation">
+                    <div class="success-icon">✓</div>
+                </div>
+                <h3 class="modal-title success">Email Sent Successfully!</h3>
+                <p class="modal-message">Your email has been sent with all company PDFs attached.</p>
+                <div class="modal-details">
+                    <p><strong>Recipient:</strong> <span id="successRecipient"></span></p>
+                    <p><strong>PDFs Attached:</strong> <span id="successPdfCount"></span></p>
+                </div>
+                <button class="modal-button success" onclick="closeModal()">Close</button>
+            </div>
+
+            <!-- Error State -->
+            <div id="modalError" class="modal-section hidden">
+                <div class="error-animation">
+                    <div class="error-icon">✕</div>
+                </div>
+                <h3 class="modal-title error">Email Failed to Send</h3>
+                <p class="modal-message">There was an error sending your email. Please try again.</p>
+                <div class="modal-details">
+                    <p><strong>Error:</strong> <span id="errorDetails"></span></p>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-button error" onclick="closeModal()">Close</button>
+                    <button class="modal-button secondary" onclick="retryEmail()">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
