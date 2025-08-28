@@ -3,77 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Sender</title>
+    <title>Inspire Email Chat - Direct Communication</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts - Ubuntu -->
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap" rel="stylesheet">
     <!-- EmailJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Configuration File -->
     <script src="config.js"></script>
     <!-- Custom Styles -->
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
-    <div class="container w-full max-w-4xl p-8 md:p-10">
-        <!-- Header Section -->
-        <div class="text-center mb-8">
-            <div class="floating mb-4">
-                <div class="w-16 h-16 bg-gradient-to-r from-[#03acff] to-[#341bca] rounded-full mx-auto flex items-center justify-center shadow-lg">
-                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                    </svg>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Main Layout Container -->
+    <div class="email-layout">
+        <!-- Left Panel - Email History -->
+        <div class="email-sidebar">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-envelope"></i>
+                    <span>Inspire Email</span>
+                </div>
+                <button class="compose-btn" onclick="showComposeArea()">
+                    <i class="fas fa-plus"></i>
+                    Compose
+                </button>
+            </div>
+
+            <!-- Email History List -->
+            <div class="email-history">
+                <div class="history-header">
+                    <h3>Today's Emails</h3>
+                    <button class="refresh-btn" onclick="refreshHistory()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                
+                <div class="email-list" id="emailList">
+                    <!-- Empty state - no emails sent today -->
+                    <div class="email-empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-inbox"></i>
+                        </div>
+                        <p class="empty-text">No emails sent today</p>
+                        <p class="empty-subtext">Your sent emails will appear here</p>
+                    </div>
                 </div>
             </div>
-            <h1 class="heading text-4xl md:text-5xl mb-4">Send Email</h1>
-            <p class="subtext text-base md:text-lg max-w-2xl mx-auto">
-                Simply enter who to send to and your message. Company brochures are automatically included!
-            </p>
+        </div>
+
+        <!-- Right Panel - Chat/Email Composition -->
+        <div class="chat-panel">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-header-content">
+                    <div class="chat-avatar">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="chat-header-info">
+                        <h1 class="chat-title">Email Chat</h1>
+                        <p class="chat-subtitle">Direct communication with company materials</p>
+                    </div>
+                    <div class="chat-status">
+                        <div class="status-indicator online"></div>
+                        <span class="status-text">Online</span>
+                    </div>
+                </div>
             </div>
 
-        <form id="emailForm" class="space-y-6">
-            <!-- Your Name -->
-            <div class="form-group">
-                <label for="name" class="form-label">Your Name</label>
-                <input type="text" id="name" name="name" required
-                       class="form-input" placeholder="Enter your name">
-                <p class="text-sm text-gray-500 mt-1">Who is sending this email?</p>
+            <!-- Chat Messages Area -->
+            <div class="chat-messages" id="chatMessages">
+                <!-- Chat area is now empty for typing focus -->
             </div>
 
-            <!-- Recipient Email (Who should receive the email) -->
-            <div class="form-group">
-                <label for="recipient" class="form-label">Send Email To</label>
-                <input type="text" id="recipient" name="recipient" required
-                       class="form-input" placeholder="Enter recipient email(s) - separate multiple emails with commas">
-                <p class="text-sm text-gray-500 mt-1">Who should receive this email? (You can add multiple emails separated by commas)</p>
+            <!-- Chat Input Area -->
+            <div class="chat-input-area">
+                <div class="chat-input-container">
+                    <!-- Message Input at Top -->
+                    <div class="message-input-group">
+                        <textarea id="messageInput" class="message-input" placeholder="Type your message here..." rows="3"></textarea>
+                        <button class="send-btn" onclick="sendEmail()" id="sendBtn">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Send Email</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Sender and Recipient Inputs at Bottom -->
+                    <div class="bottom-inputs">
+                        <!-- Sender Name Input -->
+                        <div class="input-group">
+                            <input type="text" id="senderNameInput" class="chat-input" placeholder="Your name (e.g., John Smith)">
+                            <button class="input-action-btn" onclick="setSenderName()">
+                                <i class="fas fa-user"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="sender-display" id="senderDisplay"></div>
+                        
+                        <div class="input-group">
+                            <input type="text" id="recipientInput" class="chat-input" placeholder="Who should receive this email? (e.g., john@company.com)">
+                            <button class="input-action-btn" onclick="addRecipient()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="recipients-display" id="recipientsDisplay"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Message -->
-            <div class="form-group">
-                <label for="message" class="form-label">Message</label>
-                <textarea id="message" name="message" rows="6" required
-                          class="form-input resize-none" placeholder="Type your message here..."></textarea>
+            <!-- Welcome Message at Bottom -->
+            <div class="welcome-section">
+                <!-- System Messages Display -->
+                <div class="system-messages-container" id="systemMessagesContainer">
+                    <!-- System messages will appear here -->
+                </div>
+                
+                <div class="message system-message">
+                    <div class="message-content">
+                        <div class="message-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-text">
+                            <h3>Welcome to Inspire Email Chat!</h3>
+                            <p>I'm here to help you send professional emails with company materials. Just tell me who to send to and what you want to say.</p>
+                            <div class="message-actions">
+                                <button class="action-btn" onclick="showQuickStart()">
+                                    <i class="fas fa-play"></i>
+                                    Quick Start
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-
-
-            <!-- Submit Button -->
-            <button type="submit" class="primary-button w-full py-4 text-lg font-semibold">
-                <span id="buttonText">Send Email</span>
-                <span id="buttonLoading" class="hidden">
-                    <span class="loading-spinner"></span>
-                    Sending...
-                </span>
-            </button>
-        </form>
-
-        <!-- Message Box -->
-        <div id="messageBox" class="hidden message-box" role="alert"></div>
+        </div>
     </div>
 
-    <!-- Popup Modal -->
+    <!-- Quick Start Modal -->
+    <div id="quickStartModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content quick-start-modal">
+            <div class="modal-header">
+                <h3>Quick Start Guide</h3>
+                <button class="close-btn" onclick="closeQuickStart()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="quick-start-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Add Recipients</h4>
+                        <p>Enter email addresses in the input field above</p>
+                    </div>
+                </div>
+                <div class="quick-start-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Write Message</h4>
+                        <p>Type your email message in the text area</p>
+                    </div>
+                </div>
+                <div class="quick-start-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Send with Materials</h4>
+                        <p>Click send and company brochures are automatically attached</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn primary" onclick="closeQuickStart()">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Status Modal -->
     <div id="emailModal" class="modal hidden">
         <div class="modal-overlay"></div>
         <div class="modal-content">
@@ -83,7 +194,7 @@
                     <div class="spinner"></div>
                 </div>
                 <h3 class="modal-title">Sending Email...</h3>
-                <p class="modal-message">Please wait while we send your email with attachments.</p>
+                <p class="modal-message">Please wait while we send your email with company materials.</p>
             </div>
 
             <!-- Success State -->
@@ -92,10 +203,11 @@
                     <div class="success-icon">✓</div>
                 </div>
                 <h3 class="modal-title success">Email Sent Successfully!</h3>
-                <p class="modal-message">Your email has been sent with all company PDFs attached.</p>
+                <p class="modal-message">Your email has been sent with all company materials attached.</p>
                 <div class="modal-details">
                     <p><strong>Recipient:</strong> <span id="successRecipient"></span></p>
-                    <p><strong>PDFs Attached:</strong> <span id="successPdfCount"></span></p>
+                    <p><strong>Materials Attached:</strong> <span id="successPdfCount"></span></p>
+                    <p><strong>Sent At:</strong> <span id="successTimestamp"></span></p>
                 </div>
                 <button class="modal-button success" onclick="closeModal()">Close</button>
             </div>
