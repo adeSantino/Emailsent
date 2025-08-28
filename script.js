@@ -1,14 +1,14 @@
 // Global variables
-// Note: File upload functionality has been removed
-
-// Firebase configuration - now loaded from config.js
 let firebaseConfig;
 let firebaseStorage;
+let selectedEmailId = null;
+let recipients = [];
+let emailHistory = [];
+let senderName = '';
 
 // Initialize Firebase
 async function initializeFirebase() {
     try {
-        // Get config from config.js
         firebaseConfig = window.FIREBASE_CONFIG;
         
         if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
@@ -21,8 +21,6 @@ async function initializeFirebase() {
         const app = initializeApp(firebaseConfig);
         firebaseStorage = getStorage(app);
         
-
-        
         console.log('Firebase initialized successfully');
     } catch (error) {
         console.error('Failed to initialize Firebase:', error);
@@ -30,7 +28,7 @@ async function initializeFirebase() {
     }
 }
 
-// Initialize EmailJS with config from config.js
+// Initialize EmailJS
 function initializeEmailJS() {
     try {
         const emailjsConfig = window.EMAILJS_CONFIG;
@@ -39,7 +37,6 @@ function initializeEmailJS() {
             throw new Error('EmailJS configuration not found. Please check config.js for your EmailJS credentials.');
         }
         
-        // Check if the public key is still the placeholder
         if (emailjsConfig.publicKey === "YOUR_PUBLIC_KEY") {
             throw new Error('Please update config.js with your actual EmailJS public key.');
         }
@@ -55,252 +52,274 @@ function initializeEmailJS() {
     }
 }
 
+// Sender Name Functions
+function setSenderName() {
+    const senderNameInput = document.getElementById('senderNameInput');
+    const name = senderNameInput.value.trim();
+    
+    if (name && name.length >= 2) {
+        senderName = name;
+        updateSenderDisplay();
+        senderNameInput.value = '';
+        
+        // Add system message
+        addSystemMessage(`👤 Sender name set to: ${name}`);
+    } else {
+        addSystemMessage('❌ Please enter a valid name (at least 2 characters)');
+    }
+}
 
+function removeSenderName() {
+    senderName = '';
+    updateSenderDisplay();
+    addSystemMessage('🗑️ Sender name removed');
+}
 
+function updateSenderDisplay() {
+    const display = document.getElementById('senderDisplay');
+    display.innerHTML = '';
+    
+    if (senderName) {
+        const tag = document.createElement('div');
+        tag.className = 'sender-tag';
+        tag.innerHTML = `
+            <i class="fas fa-user"></i>
+            ${senderName}
+            <button class="remove-btn" onclick="removeSenderName()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        display.appendChild(tag);
+    }
+}
 
+// Email History Functions
+function selectEmail(emailId) {
+    // Remove active class from all email items
+    document.querySelectorAll('.email-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Add active class to selected email
+    const selectedItem = document.querySelector(`[data-email-id="${emailId}"]`);
+    if (selectedItem) {
+        selectedItem.classList.add('active');
+    }
+    
+    selectedEmailId = emailId;
+    
+    // Load email details
+    loadEmailDetails(emailId);
+}
 
+function loadEmailDetails(emailId) {
+    const email = emailHistory.find(e => e.id === emailId);
+    if (email) {
+        console.log(`Selected email:`, email);
+        
+        // Add a message to the chat area showing the selected email
+        addSystemMessage(`📧 Selected email sent by ${email.senderName} to ${email.recipients.join(', ')} at ${email.time}`);
+        
+        // You could also populate the input fields with the email content
+        // document.getElementById('recipientInput').value = email.recipients.join(', ');
+        // document.getElementById('messageInput').value = email.message;
+    }
+}
 
+function refreshHistory() {
+    console.log('Refreshing email history...');
+    
+    // Add a loading state to the refresh button
+    const refreshBtn = document.querySelector('.refresh-btn');
+    const originalIcon = refreshBtn.innerHTML;
+    
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    // Simulate refresh delay
+    setTimeout(() => {
+        refreshBtn.innerHTML = originalIcon;
+        addSystemMessage('Email history refreshed');
+    }, 1000);
+}
 
+function showComposeArea() {
+    // Clear any selected email
+    selectedEmailId = null;
+    document.querySelectorAll('.email-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Clear recipients and message
+    recipients = [];
+    document.getElementById('recipientInput').value = '';
+    document.getElementById('messageInput').value = '';
+    updateRecipientsDisplay();
+    
+    // Add system message
+    addSystemMessage('✏️ Compose new email');
+}
 
+function updateEmailHistoryDisplay() {
+    const emailList = document.getElementById('emailList');
+    
+    if (emailHistory.length === 0) {
+        // Show empty state
+        emailList.innerHTML = `
+            <div class="email-empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-inbox"></i>
+                </div>
+                <p class="empty-text">No emails sent today</p>
+                <p class="empty-subtext">Your sent emails will appear here</p>
+            </div>
+        `;
+    } else {
+        // Show email history
+        emailList.innerHTML = emailHistory.map(email => `
+            <div class="email-item" data-email-id="${email.id}" onclick="selectEmail(${email.id})">
+                <div class="email-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="email-content">
+                    <div class="email-sender">${email.recipients.join(', ')}</div>
+                    <div class="email-subject">${email.subject || 'No subject'}</div>
+                    <div class="email-preview">${email.message.substring(0, 60)}${email.message.length > 60 ? '...' : ''}</div>
+                    <div class="email-time">${email.time}</div>
+                </div>
+                <div class="email-status">
+                    <i class="fas fa-check-circle text-green-500"></i>
+                </div>
+            </div>
+        `).join('');
+    }
+}
 
-// Function to fetch specific PDFs from Firebase Storage 'pdfs' folder
-async function fetchSpecificPDFsFromStorage() {
-    try {
-        if (!firebaseStorage) {
-            await initializeFirebase();
+// Chat Functions
+function addSystemMessage(message) {
+    const systemMessagesContainer = document.getElementById('systemMessagesContainer');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message system-message';
+    
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <div class="message-icon">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="message-text">
+                <p>${message}</p>
+            </div>
+        </div>
+    `;
+    
+    systemMessagesContainer.appendChild(messageDiv);
+    
+    // Scroll to the bottom of the system messages
+    systemMessagesContainer.scrollTop = systemMessagesContainer.scrollHeight;
+    
+    // Auto-remove old messages after 5 seconds (except welcome message)
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
         }
+    }, 5000);
+}
 
-        const { listAll, ref } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js");
-        
-        // Reference to the 'pdfs' folder in Firebase Storage
-        const pdfsFolderRef = ref(firebaseStorage, 'pdfs');
-        
-        // List all files in the pdfs folder
-        const result = await listAll(pdfsFolderRef);
-        
-        const pdfFiles = {};
-        
-        // Process each file in the pdfs folder
-        for (const item of result.items) {
-            try {
-                // Get download URL for each file
-                const { getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js");
-                const downloadURL = await getDownloadURL(item);
-                
-                // Get file name without extension
-                const fileName = item.name.toLowerCase();
-                
-                console.log(`Processing PDF file: "${item.name}" (lowercase: "${fileName}")`);
-                
-                // Match files to template variables based on filename - more specific matching
-                let matched = false;
-                
-                // Check for Inspire Company Profile (most specific first)
-                if (fileName.includes('inspire') && !matched) {
-                    pdfFiles.pdf_inspire = {
-                        name: item.name,
-                        url: downloadURL,
-                        type: 'application/pdf'
-                    };
-                    console.log(`✅ Matched to pdf_inspire: ${item.name}`);
-                    matched = true;
-                }
-                
-                // Check for NEO Brochure (most specific first)
-                if (fileName.includes('neo') && !matched) {
-                    pdfFiles.pdf_neo = {
-                        name: item.name,
-                        url: downloadURL,
-                        type: 'application/pdf'
-                    };
-                    console.log(`✅ Matched to pdf_neo: ${item.name}`);
-                    matched = true;
-                }
-                
-                // Check for SQRC Brochure (most specific first)
-                if (fileName.includes('sqrc') && !matched) {
-                    pdfFiles.pdf_sqrc = {
-                        name: item.name,
-                        url: downloadURL,
-                        type: 'application/pdf'
-                    };
-                    console.log(`✅ Matched to pdf_sqrc: ${item.name}`);
-                    matched = true;
-                }
-                
-                // Fallback matching for files that might have "brochure" in name
-                if (!matched) {
-                    if (fileName.includes('company') || fileName.includes('profile')) {
-                        pdfFiles.pdf_inspire = {
-                            name: item.name,
-                            url: downloadURL,
-                            type: 'application/pdf'
-                        };
-                        console.log(`✅ Fallback matched to pdf_inspire: ${item.name}`);
-                        matched = true;
-                    } else if (fileName.includes('brochure') && !pdfFiles.pdf_neo && !pdfFiles.pdf_sqrc) {
-                        // Only assign to neo if sqrc is not already assigned
-                        if (!pdfFiles.pdf_neo) {
-                            pdfFiles.pdf_neo = {
-                                name: item.name,
-                                url: downloadURL,
-                                type: 'application/pdf'
-                            };
-                            console.log(`✅ Fallback matched to pdf_neo: ${item.name}`);
-                        } else if (!pdfFiles.pdf_sqrc) {
-                            pdfFiles.pdf_sqrc = {
-                                name: item.name,
-                                url: downloadURL,
-                                type: 'application/pdf'
-                            };
-                            console.log(`✅ Fallback matched to pdf_sqrc: ${item.name}`);
-                        }
-                        matched = true;
-                    }
-                }
-                
-                if (!matched) {
-                    console.log(`❌ No match found for: ${item.name}`);
-                }
-                
-                console.log(`Found PDF: ${item.name} -> ${downloadURL}`);
-                
-            } catch (error) {
-                console.error(`Error getting download URL for ${item.name}:`, error);
-            }
-        }
-        
-        // Log summary of what was found
-        console.log('📋 PDF Matching Summary:');
-        console.log('  pdf_inspire:', pdfFiles.pdf_inspire ? `✅ ${pdfFiles.pdf_inspire.name}` : '❌ Not found');
-        console.log('  pdf_neo:', pdfFiles.pdf_neo ? `✅ ${pdfFiles.pdf_neo.name}` : '❌ Not found');
-        console.log('  pdf_sqrc:', pdfFiles.pdf_sqrc ? `✅ ${pdfFiles.pdf_sqrc.name}` : '❌ Not found');
-        
-        // Validate that all 3 PDFs are found
-        const missingPDFs = [];
-        if (!pdfFiles.pdf_inspire) missingPDFs.push('Inspire Company Profile');
-        if (!pdfFiles.pdf_neo) missingPDFs.push('NEO Brochure');
-        if (!pdfFiles.pdf_sqrc) missingPDFs.push('SQRC Brochure');
-        
-        if (missingPDFs.length > 0) {
-            console.warn(`⚠️ Missing PDFs: ${missingPDFs.join(', ')}`);
-            console.warn('This might cause issues with email sending.');
+function addRecipient() {
+    const recipientInput = document.getElementById('recipientInput');
+    const email = recipientInput.value.trim();
+    
+    if (email && isValidEmail(email)) {
+        if (!recipients.includes(email)) {
+            recipients.push(email);
+            updateRecipientsDisplay();
+            recipientInput.value = '';
+            
+            // Add system message
+            addSystemMessage(`✅ Added recipient: ${email}`);
         } else {
-            console.log('🎉 All 3 required PDFs found successfully!');
+            addSystemMessage(`ℹ️ Recipient ${email} already added`);
         }
-        
-        // Log all files found for debugging
-        console.log('📁 All files found in pdfs folder:');
-        result.items.forEach(item => console.log(`  - ${item.name}`));
-        
-        return pdfFiles;
-        
-    } catch (error) {
-        console.error('Error fetching PDFs from storage:', error);
-        throw error;
+    } else {
+        addSystemMessage('❌ Please enter a valid email address');
     }
 }
 
-// Function to create email template parameters with specific PDF variables
-function createEmailTemplateParams(formData, pdfFiles) {
-    const templateParams = {
-        // Sender information
-        name: formData.name,                     // Who is sending the email
-        sender_name: formData.name,              // Alternative name field
-        
-        // EmailJS standard recipient fields (multiple options to ensure compatibility)
-        to_email: formData.recipient,          // Who receives the email - EmailJS standard field
-        recipient: formData.recipient,          // Alternative recipient field
-        email: formData.recipient,              // Another common recipient field
-        
-        // Email content - only essential fields
-        message: formData.message,              // Email message
-        time: new Date().toLocaleString(),      // Current timestamp
-        
-        // Specific PDF variables for your EmailJS template
-        pdf_inspire: pdfFiles.pdf_inspire?.url || '#',
-        pdf_neo: pdfFiles.pdf_neo?.url || '#',
-        pdf_sqrc: pdfFiles.pdf_sqrc?.url || '#',
-        
-        // Additional file info (optional)
-        pdf_inspire_name: pdfFiles.pdf_inspire?.name || 'Inspire Company Profile',
-        pdf_neo_name: pdfFiles.pdf_neo?.name || 'NEO Brochure',
-        pdf_sqrc_name: pdfFiles.pdf_sqrc?.name || 'SQRC Brochure'
-    };
+function removeRecipient(email) {
+    recipients = recipients.filter(r => r !== email);
+    updateRecipientsDisplay();
+    addSystemMessage(`🗑️ Removed recipient: ${email}`);
+}
+
+function updateRecipientsDisplay() {
+    const display = document.getElementById('recipientsDisplay');
+    display.innerHTML = '';
     
-    return templateParams;
+    recipients.forEach(email => {
+        const tag = document.createElement('div');
+        tag.className = 'recipient-tag';
+        tag.innerHTML = `
+            ${email}
+            <button class="remove-btn" onclick="removeRecipient('${email}')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        display.appendChild(tag);
+    });
 }
 
-// Function to test EmailJS configuration
-function testEmailJSConfig() {
-    try {
-        const emailjsConfig = window.EMAILJS_CONFIG;
-        
-        if (!emailjsConfig) {
-            console.error('❌ EmailJS config not loaded from config.js');
-            return false;
-        }
-        
-        console.log('📧 EmailJS Configuration Status:');
-        console.log('  Public Key:', emailjsConfig.publicKey ? '✅ Loaded' : '❌ Missing');
-        console.log('  Service ID:', emailjsConfig.serviceID ? '✅ Loaded' : '❌ Missing');
-        console.log('  Template ID:', emailjsConfig.templateID ? '✅ Loaded' : '❌ Missing');
-        
-        if (emailjsConfig.publicKey === "YOUR_PUBLIC_KEY") {
-            console.error('❌ Public Key still has placeholder value');
-            return false;
-        }
-        
-        if (emailjsConfig.serviceID === "YOUR_SERVICE_ID") {
-            console.error('❌ Service ID still has placeholder value');
-            return false;
-        }
-        
-        if (emailjsConfig.templateID === "YOUR_TEMPLATE_ID") {
-            console.error('❌ Template ID still has placeholder value');
-            return false;
-        }
-        
-        console.log('✅ All EmailJS configuration values are properly set!');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Error testing EmailJS config:', error);
-        return false;
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Quick Start Modal Functions
+function showQuickStart() {
+    const modal = document.getElementById('quickStartModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('show');
+}
+
+function closeQuickStart() {
+    const modal = document.getElementById('quickStartModal');
+    modal.classList.remove('show');
+    modal.classList.add('hidden');
+}
+
+// Email Functions
+async function sendEmail() {
+    if (!senderName) {
+        addSystemMessage('❌ Please set your sender name first');
+        return;
     }
-}
-
-
-
-
-
-// Form submission handler
-async function handleFormSubmit(event) {
-    event.preventDefault(); // Prevent default form submission
-
-    console.log('Form submitted! Starting email process...');
-
+    
+    if (recipients.length === 0) {
+        addSystemMessage('❌ Please add at least one recipient');
+        return;
+    }
+    
+    const message = document.getElementById('messageInput').value.trim();
+    if (!message) {
+        addSystemMessage('❌ Please enter a message');
+        return;
+    }
+    
     // Show loading state
-    const sendButton = event.target.querySelector('button[type="submit"]');
-    const buttonText = document.getElementById('buttonText');
-    const buttonLoading = document.getElementById('buttonLoading');
+    const sendBtn = document.getElementById('sendBtn');
+    const originalContent = sendBtn.innerHTML;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
     
-    sendButton.disabled = true;
-    buttonText.classList.add('hidden');
-    buttonLoading.classList.remove('hidden');
-
-    // Show loading modal
-    showModalLoading();
-
+    // Add system message
+    addSystemMessage('📤 Sending email...');
+    
     try {
         console.log('Step 1: Fetching PDFs from Firebase...');
         
-        // Fetch specific PDFs from the 'pdfs' folder in Firebase Storage
         const pdfFiles = await fetchSpecificPDFsFromStorage();
         
         console.log('PDFs fetched:', pdfFiles);
         
-        // Validate that all required PDFs are found
+        // Validate PDFs
         const requiredPDFs = ['pdf_inspire', 'pdf_neo', 'pdf_sqrc'];
         const missingPDFs = requiredPDFs.filter(key => !pdfFiles[key]);
         
@@ -314,175 +333,221 @@ async function handleFormSubmit(event) {
                 }
             });
             
-            showModalError(`Missing required PDFs: ${missingNames.join(', ')}. Please check your Firebase Storage pdfs folder.`);
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
+            addSystemMessage(`❌ Error: Missing required PDFs: ${missingNames.join(', ')}`);
             return;
         }
         
         console.log('✅ All 3 required PDFs found and validated!');
         
-        if (Object.keys(pdfFiles).length === 0) {
-            showModalError('No PDF files found in Firebase Storage. Please check your pdfs folder.');
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
-            return;
-        }
-
-        console.log('Step 2: Getting form data...');
-        
-        // Get form data
+        // Create form data
         const formData = {
-            name: document.getElementById('name').value,
-            recipient: document.getElementById('recipient').value,
-            message: document.getElementById('message').value
+            name: senderName,
+            recipient: recipients.join(', '),
+            message: message
         };
-
+        
         console.log('Form data:', formData);
-
-        // Validate required fields
-        if (!formData.name || !formData.recipient || !formData.message) {
-            showModalError('Please fill in all required fields.');
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
-            return;
-        }
         
-        // Additional validation for recipient email
-        if (!formData.recipient.trim()) {
-            showModalError('Recipient email address cannot be empty.');
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
-            return;
-        }
-        
-        // Log the exact recipient value for debugging
-        console.log('Recipient email value:', `"${formData.recipient}"`);
-        console.log('Recipient email length:', formData.recipient.length);
-        console.log('Recipient email trimmed:', `"${formData.recipient.trim()}"`);
-
-        console.log('Step 3: Creating email template parameters...');
-
-        // Create email template parameters with PDF variables
+        // Create template parameters
         const templateParams = createEmailTemplateParams(formData, pdfFiles);
-
+        
         console.log('Template parameters:', templateParams);
-        console.log('Recipient email being sent:', formData.recipient);
-        console.log('Sender name being sent:', formData.name);
-        console.log('All template params keys:', Object.keys(templateParams));
-
-        console.log('Step 4: Getting EmailJS configuration...');
-
+        
         // Get EmailJS configuration
         const emailjsConfig = window.EMAILJS_CONFIG;
         
-        // Check if EmailJS is properly initialized
         if (!emailjsConfig || !emailjsConfig.publicKey) {
-            showModalError('EmailJS not initialized. Please check your configuration.');
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
+            addSystemMessage('❌ Error: EmailJS not initialized');
             return;
         }
         
         const serviceID = emailjsConfig.serviceID;
         const templateID = emailjsConfig.templateID;
         
-        console.log('EmailJS config:', { 
-            publicKey: emailjsConfig.publicKey.substring(0, 10) + '...',
-            serviceID, 
-            templateID 
-        });
-        
         if (!serviceID || !templateID || serviceID === "YOUR_SERVICE_ID" || templateID === "YOUR_TEMPLATE_ID") {
-            showModalError('EmailJS configuration incomplete. Please update config.js with your service ID and template ID.');
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
-            return;
-        }
-
-        console.log('Step 5: Sending email via EmailJS...');
-
-        // Ensure recipient is always included
-        if (!templateParams.recipient && !templateParams.to_email && !templateParams.email) {
-            showModalError('Recipient email is missing from template parameters.');
-            sendButton.disabled = false;
-            buttonText.classList.remove('hidden');
-            buttonLoading.classList.add('hidden');
+            addSystemMessage('❌ Error: EmailJS configuration incomplete');
             return;
         }
         
-        // Debug: Log all recipient fields being sent
-        console.log('🔍 Recipient Debug Info:');
-        console.log('  formData.recipient:', `"${formData.recipient}"`);
-        console.log('  templateParams.recipient:', `"${templateParams.recipient}"`);
-        console.log('  templateParams.to_email:', `"${templateParams.to_email}"`);
-        console.log('  templateParams.email:', `"${templateParams.email}"`);
-        console.log('  All template params keys:', Object.keys(templateParams));
+        console.log('Sending email via EmailJS...');
         
-        console.log('Final template parameters being sent to EmailJS:', templateParams);
-        
-        // Send email using EmailJS with PDF variables
+        // Send email
         emailjs.send(serviceID, templateID, templateParams)
             .then(() => {
                 console.log('Email sent successfully!');
                 
+                // Add success message
+                addSystemMessage(`✅ Email sent successfully by ${senderName} to ${recipients.length} recipient(s)!`);
+                
+                // Add to email history
+                addToEmailHistory(recipients, message);
+                
                 // Show success modal
                 const pdfCount = Object.keys(pdfFiles).length;
-                showModalSuccess(formData.recipient, `${pdfCount} PDFs`);
+                const timestamp = new Date().toLocaleString();
+                showModalSuccess(formData.recipient, `${pdfCount} PDFs`, timestamp);
                 
-                // Reset form
-                document.getElementById('emailForm').reset();
-                uploadedFiles = [];
-                fileUrls = [];
-                autoPdfUploaded = false;
-                updateFileList();
+                // Clear form
+                recipients = [];
+                document.getElementById('messageInput').value = '';
+                updateRecipientsDisplay();
+                
             }, (error) => {
                 console.error('EmailJS Error:', error);
-                showModalError(`Failed to send email: ${error.text || error}`);
+                addSystemMessage(`❌ Failed to send email: ${error.text || error}`);
             })
             .finally(() => {
                 // Reset button state
-                sendButton.disabled = false;
-                buttonText.classList.remove('hidden');
-                buttonLoading.classList.add('hidden');
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = originalContent;
             });
-
+            
     } catch (error) {
-        console.error('Error in form submission:', error);
-        showModalError(`Error preparing email: ${error.message}`);
+        console.error('Error in email sending:', error);
+        addSystemMessage(`❌ Error: ${error.message}`);
         
         // Reset button state
-        sendButton.disabled = false;
-        buttonText.classList.remove('hidden');
-        buttonLoading.classList.add('hidden');
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = originalContent;
     }
 }
 
-// Function to show a custom message box instead of alert()
-function showMessageBox(message, type = 'info') {
-    const messageBox = document.getElementById('messageBox');
-    messageBox.textContent = message;
-    messageBox.classList.remove('hidden', 'success', 'error', 'info');
+function addToEmailHistory(recipients, message) {
+    const newEmail = {
+        id: Date.now(), // Use timestamp as unique ID
+        senderName: senderName,
+        recipients: [...recipients],
+        message: message,
+        subject: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+        time: new Date().toLocaleString(),
+        timestamp: new Date()
+    };
+    
+    // Add to beginning of history (most recent first)
+    emailHistory.unshift(newEmail);
+    
+    // Keep only today's emails
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    emailHistory = emailHistory.filter(email => email.timestamp >= today);
+    
+    // Update the display
+    updateEmailHistoryDisplay();
+    
+    console.log('Added to email history:', newEmail);
+    console.log('Current history:', emailHistory);
+}
 
-    messageBox.classList.add(type);
-    messageBox.classList.remove('hidden'); // Make it visible
-    messageBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Scroll to it
+// PDF Functions (keeping existing functionality)
+async function fetchSpecificPDFsFromStorage() {
+    try {
+        if (!firebaseStorage) {
+            await initializeFirebase();
+        }
 
-    // Auto-hide success messages after 5 seconds
-    if (type === 'success') {
-        setTimeout(() => {
-            messageBox.classList.add('hidden');
-        }, 5000);
+        const { listAll, ref } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js");
+        
+        const pdfsFolderRef = ref(firebaseStorage, 'pdfs');
+        const result = await listAll(pdfsFolderRef);
+        
+        const pdfFiles = {};
+        
+        for (const item of result.items) {
+            try {
+                const { getDownloadURL } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js");
+                const downloadURL = await getDownloadURL(item);
+                
+                const fileName = item.name.toLowerCase();
+                
+                let matched = false;
+                
+                if (fileName.includes('inspire') && !matched) {
+                    pdfFiles.pdf_inspire = {
+                        name: item.name,
+                        url: downloadURL,
+                        type: 'application/pdf'
+                    };
+                    matched = true;
+                }
+                
+                if (fileName.includes('neo') && !matched) {
+                    pdfFiles.pdf_neo = {
+                        name: item.name,
+                        url: downloadURL,
+                        type: 'application/pdf'
+                    };
+                    matched = true;
+                }
+                
+                if (fileName.includes('sqrc') && !matched) {
+                    pdfFiles.pdf_sqrc = {
+                        name: item.name,
+                        url: downloadURL,
+                        type: 'application/pdf'
+                    };
+                    matched = true;
+                }
+                
+                if (!matched) {
+                    if (fileName.includes('company') || fileName.includes('profile')) {
+                        pdfFiles.pdf_inspire = {
+                            name: item.name,
+                            url: downloadURL,
+                            type: 'application/pdf'
+                        };
+                        matched = true;
+                    } else if (fileName.includes('brochure') && !pdfFiles.pdf_neo && !pdfFiles.pdf_sqrc) {
+                        if (!pdfFiles.pdf_neo) {
+                            pdfFiles.pdf_neo = {
+                                name: item.name,
+                                url: downloadURL,
+                                type: 'application/pdf'
+                            };
+                        } else if (!pdfFiles.pdf_sqrc) {
+                            pdfFiles.pdf_sqrc = {
+                                name: item.name,
+                                url: downloadURL,
+                                type: 'application/pdf'
+                            };
+                        }
+                        matched = true;
+                    }
+                }
+                
+            } catch (error) {
+                console.error(`Error getting download URL for ${item.name}:`, error);
+            }
+        }
+        
+        return pdfFiles;
+        
+    } catch (error) {
+        console.error('Error fetching PDFs from storage:', error);
+        throw error;
     }
 }
 
-// Modal control functions
+function createEmailTemplateParams(formData, pdfFiles) {
+    const templateParams = {
+        name: formData.name,
+        sender_name: formData.name,
+        to_email: formData.recipient,
+        recipient: formData.recipient,
+        email: formData.recipient,
+        message: formData.message,
+        time: new Date().toLocaleString(),
+        pdf_inspire: pdfFiles.pdf_inspire?.url || '#',
+        pdf_neo: pdfFiles.pdf_neo?.url || '#',
+        pdf_sqrc: pdfFiles.pdf_sqrc?.url || '#',
+        pdf_inspire_name: pdfFiles.pdf_inspire?.name || 'Inspire Company Profile',
+        pdf_neo_name: pdfFiles.pdf_neo?.name || 'NEO Brochure',
+        pdf_sqrc_name: pdfFiles.pdf_sqrc?.name || 'SQRC Brochure'
+    };
+    
+    return templateParams;
+}
+
+// Modal Functions
 function showModal() {
     const modal = document.getElementById('emailModal');
     modal.classList.remove('hidden');
@@ -506,14 +571,14 @@ function showModalLoading() {
     document.getElementById('modalError').classList.add('hidden');
 }
 
-function showModalSuccess(recipient, pdfCount) {
+function showModalSuccess(recipient, pdfCount, timestamp) {
     document.getElementById('modalLoading').classList.add('hidden');
     document.getElementById('modalSuccess').classList.remove('hidden');
     document.getElementById('modalError').classList.add('hidden');
     
-    // Update success details
     document.getElementById('successRecipient').textContent = recipient;
     document.getElementById('successPdfCount').textContent = pdfCount;
+    document.getElementById('successTimestamp').textContent = timestamp;
 }
 
 function showModalError(errorMessage) {
@@ -521,65 +586,71 @@ function showModalError(errorMessage) {
     document.getElementById('modalSuccess').classList.add('hidden');
     document.getElementById('modalError').classList.remove('hidden');
     
-    // Update error details
     document.getElementById('errorDetails').textContent = errorMessage;
 }
 
-// Retry function for failed emails
 function retryEmail() {
     hideModal();
-    // Reset form and try again
-    document.getElementById('emailForm').dispatchEvent(new Event('submit'));
+    sendEmail();
 }
 
-// Close modal when clicking outside
+// Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('emailModal');
-    const modalOverlay = document.querySelector('.modal-overlay');
+    console.log('🚀 Inspire Email Chat initializing...');
     
-    if (modalOverlay) {
-        modalOverlay.addEventListener('click', function(e) {
-            if (e.target === modalOverlay) {
-                closeModal();
-            }
-        });
-    }
+    // Initialize services
+    initializeFirebase();
+    initializeEmailJS();
     
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-            closeModal();
+    // Initialize displays
+    updateEmailHistoryDisplay();
+    updateSenderDisplay();
+    
+    // Setup keyboard shortcuts
+    document.getElementById('senderNameInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            setSenderName();
         }
     });
+    
+    document.getElementById('recipientInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            addRecipient();
+        }
+    });
+    
+    document.getElementById('messageInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendEmail();
+        }
+    });
+    
+    // Close modals when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal-overlay')) {
+            closeModal();
+            closeQuickStart();
+        }
+    });
+    
+    // Close modals with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+            closeQuickStart();
+        }
+    });
+    
+    console.log('✅ Inspire Email Chat initialized successfully');
 });
 
-// Initialize everything when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Email Sender initializing...');
-    
-    // Test EmailJS configuration first
-    testEmailJSConfig();
-    
-    // Initialize Firebase
-    initializeFirebase();
-    initializeEmailJS(); // Initialize EmailJS
-    
-    // Setup event listeners
-    document.getElementById('emailForm').addEventListener('submit', handleFormSubmit);
-    
-    console.log('✅ Email Sender initialized successfully');
-    
-    // Add debug function to global scope for console testing
-    window.debugPDFs = async function() {
-        console.log('🔍 Debugging PDF files in Firebase Storage...');
-        try {
-            const pdfFiles = await fetchSpecificPDFsFromStorage();
-            console.log('📊 Final PDF mapping:', pdfFiles);
-            return pdfFiles;
-        } catch (error) {
-            console.error('❌ Debug failed:', error);
-        }
-    };
-    
-    console.log('💡 Use debugPDFs() in console to check PDF status');
-}); 
+// Debug function
+window.debugChat = function() {
+    console.log('Chat Debug Info:');
+    console.log('Sender Name:', senderName);
+    console.log('Selected Email ID:', selectedEmailId);
+    console.log('Recipients:', recipients);
+    console.log('Email History:', emailHistory);
+    console.log('Firebase Storage:', firebaseStorage);
+}; 
